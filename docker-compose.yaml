@@ -28,28 +28,6 @@ services:
 
   #### Redis ####
 
-  fastapi-db-compare-mini:
-    build:
-      context: .
-      dockerfile: Docker/Dockerfile_FastAPI
-    image: tests/db-compare
-    container_name: fastapi-db-compare-mini
-    restart: "unless-stopped"
-    environment:
-      APP_NAME: ${APP_NAME}
-      ENVIRONMENT: ${ENVIRONMENT}
-      CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN}
-    ports:
-      - 9555:80
-    command: uvicorn mytest:app --host 0.0.0.0 --port 80 --reload
-    depends_on:
-      - fastapi-db-compare-mongo
-      - fastapi-db-compare-postgres
-    volumes:
-      - ./github_post/mytest.py:/app/mytest.py:ro
-    networks:
-      - fastapi-db-compare-network
-
   fastapi-db-compare-redis:
     container_name: fastapi-db-compare-redis
     image: "redis/redis-stack:6.2.6-v7"
@@ -74,6 +52,8 @@ services:
     image: mongo:6
     container_name: fastapi-db-compare-mongo
     restart: "unless-stopped"
+    ports:
+      - 29017:27017
     expose:
       - 27017
     command: mongod --bind_ip=0.0.0.0 --dbpath /data/db
@@ -123,6 +103,31 @@ services:
     networks:
       - fastapi-db-compare-network
 
+
+  fastapi-db-compare-dbgate:
+    image: dbgate/dbgate:5.2.6-alpine
+    container_name: fastapi-db-compare-dbgate
+    restart: "unless-stopped"
+    ports:
+      - 9801:3000
+    volumes:
+      - dbgate-data:/root/.dbgate
+    environment:
+      CONNECTIONS: con1,con2
+      # con1 definition : MongoDB
+      LABEL_con1: MongoDB
+      URL_con1: mongodb://fastapi-db-compare-mongo:27017
+      ENGINE_con1: mongo@dbgate-plugin-mongo
+      # con2 definition : PostgreSQL
+      LABEL_con2: Postgres
+      SERVER_con2: fastapi-db-compare-postgres
+      USER_con2: root
+      PASSWORD_con2: root
+      PORT_con2: 5432
+      ENGINE_con2: postgres@dbgate-plugin-postgres
+    networks:
+      - fastapi-db-compare-network
+
 volumes:
   redis-data: 
     name: fastapi-db-compare-redis-data
@@ -132,6 +137,8 @@ volumes:
     name: fastapi-db-compare-postgres-data
   pgadmin-data:
     name: fastapi-db-compare-pgadmin-data
+  dbgate-data:
+    name: fastapi-db-compare-dbgate
 
 networks:
   fastapi-db-compare-network:

@@ -2,23 +2,24 @@
 
 Comparatifs de performances pour BDD
 
-Poste Github : https://github.com/pydantic/pydantic/issues/857#issuecomment-1644311858
-
-Voir le code dans `github_post`
-
-## Test 1
-
-Candidats :
+Candidates :
 * `Redis` (DB mode)
 * `PostgreSQL`
 * `MongoDB`
 
-Conditions de test :
-* Une unique entitée (Student) à écrire
-* La liste de ces entitées à lire
+Databases visualisation tools :
+* RedisInsight http://localhost:9901
+* MongoExpress http://localhost:9902
+* pgAdmin4     http://localhost:9903
 
+## Test 1
 
-Résultats procédés sur une VM d'un serveur OVH (jet.tripy.be)
+Test conditions :
+* One uniq model to write (Student)
+* A list of models to read (many Students)
+
+> 👉 You should proceed FastAPI DB tests on a hosted VM for a more realistic results
+> 👉 Tests results where realized on an OVH VM (Debian server)
 
 ```bash
 python3 tests/stress.py
@@ -39,35 +40,54 @@ python3 tests/stress.py
 
 ## Test 2
 
-`Redis` a été retiré des candidats car la BDD est stockée en mémoire vive, et donc prendre potentiellement trop de ressources sur le projet TripyMap3. Elle est d'un autre côté très bien pour les petites BDD (sans stockage de médias par exemple).
-
-Candidats :
-* `PostgreSQL`
-* `MongoDB`
+`Redis` a été retiré des candidates car la BDD est stockée en mémoire vive, et donc prendre potentiellement trop de ressources sur le projet TripyMap3. Elle est d'un autre côté très bien pour les petites BDD (sans stockage de médias par exemple).
 
 Même cas de figure que Test 1 mais avec plusieurs relations supplémentaires liées à l'entitée principale (Student)
 
-```python
-class StudentMongo(Model):
-    # 1 - via modèle direct
-    friends: List[StudentFriendMongo]
-    parents: List[ParentMongo]
-    # OU 
-    # 2 - via référence
-    friends: List[ObjectId]
-    parents: List[ObjectId]
-```
+### résultat
 
-Pro/Con 1 - via modèle direct
-* 💚 création des sous-entitées en liste à la volée
-* 💔 pas de possibilité de les récupérer séparément (voir test2.py GET /mongo/parent)
-* 💔 création des sous-entitées séparément impossible
+Postgres + Ormar est plus performant d'environ 20%
+MAIS la création du modèle est bien plus complexe, ainsi que sa migration.
 
-Pro/Con 1 - via référence
-* 💛 la création des sous-entitées doit être faite séparément
-* 💚 possibilité de les récupérer séparément (voir test2.py GET /mongo/parent)
-* 💔 pas d'affichage des champs des sous-entitées de façon naturelle dans le corp de l'entité parent (seulement les IDs apparaissent)
+Article intéressant : https://www.algoo.fr/fr/actualites/article/fastapi-et-sqlalchemy-un-duo-puissant-mais-attention-aux-transactions
+
+MongoDB est donc choisi comme Database. Maintenant reste à choisir l'ODM (Test 3)
+
+FastAPI utils
+https://github.com/mjhea0/awesome-fastapi
+
+ORM SQL Postgres
+https://github.com/piccolo-orm/piccolo
+https://collerek.github.io/ormar/
+https://github.com/Ignisor/FastAPIwee
+https://github.com/RobertCraigie/prisma-client-py
+
+ODM NoSQL MongoDB
+https://github.com/art049/odmantic
+https://github.com/roman-right/beanie
+    example  https://github.com/roman-right/beanie-fastapi-demo
+
+
+
 
 ## Test 3
 
-Voir facilités de migration face à un changement de modèle
+ODMantic VS Beanie
+
+Beanie grand gagnant !! Grâce à ses relations 'Link' et baward relation 'BackLink'
+
+Il peut aussi facilement récupérer les relations avec `Model.all(fetch_links=True)`
+
+### PC local
+
+>POST x10 on /test3/odmantic in 2.62 seconds (request average 0.26)
+>Errors 0
+>POST x10 on /test3/beanie in 2.58 seconds (request average 0.26)
+>Errors 0
+>GET x10 on /test3/odmantic in 3.44 seconds (request average 0.34)
+>Errors 0
+>GET x10 on /test3/beanie in 2.21 seconds (request average 0.22)
+>Errors 0
+
+Beanie est aussi 40% plus rapide sur les opérations de lecture, alors que odmantic n'a pas de récupération des Relations sur ce test
+
