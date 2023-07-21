@@ -1,12 +1,4 @@
 from fastapi import APIRouter
-
-router = APIRouter(
-    prefix='/test',
-    tags=["test"]
-)
-
-# TODO : idem Test1 mais avec deux relations en plus
-
 from pydantic import EmailStr
 from odmantic import Model, Reference
 from odmantic import Field as OdField
