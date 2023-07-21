@@ -1,0 +1,141 @@
+version: "3.4"
+
+services:
+
+  fastapi-db-compare-backend:
+    build:
+      context: .
+      dockerfile: Docker/Dockerfile_FastAPI
+    image: fastapi-db-compare/fastapi
+    container_name: fastapi-db-compare-backend
+    restart: "unless-stopped"
+    environment:
+      APP_NAME: ${APP_NAME}
+      ENVIRONMENT: ${ENVIRONMENT}
+      REDIS_OM_URL: redis://fastapi-db-compare-redis:6379
+      CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN}
+    ports:
+      - 9900:80
+    command: uvicorn main:app --host 0.0.0.0 --port 80 --reload
+    depends_on:
+      - fastapi-db-compare-redis
+      - fastapi-db-compare-mongo
+      - fastapi-db-compare-postgres
+    volumes:
+      - ./src:/app:ro
+    networks:
+      - fastapi-db-compare-network
+
+  #### Redis ####
+
+  fastapi-db-compare-mini:
+    build:
+      context: .
+      dockerfile: Docker/Dockerfile_FastAPI
+    image: tests/db-compare
+    container_name: fastapi-db-compare-mini
+    restart: "unless-stopped"
+    environment:
+      APP_NAME: ${APP_NAME}
+      ENVIRONMENT: ${ENVIRONMENT}
+      CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN}
+    ports:
+      - 9555:80
+    command: uvicorn mytest:app --host 0.0.0.0 --port 80 --reload
+    depends_on:
+      - fastapi-db-compare-mongo
+      - fastapi-db-compare-postgres
+    volumes:
+      - ./github_post/mytest.py:/app/mytest.py:ro
+    networks:
+      - fastapi-db-compare-network
+
+  fastapi-db-compare-redis:
+    container_name: fastapi-db-compare-redis
+    image: "redis/redis-stack:6.2.6-v7"
+    expose:
+      - 6379
+    ports:
+      - 9901:8001 # Redis dev UI
+    environment:
+      REDIS_ARGS: --appendonly yes # use Redis as persistence DB
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    networks:
+      - fastapi-db-compare-network
+    volumes:
+      - redis-data:/data
+
+  #### MongoDB ####
+
+  fastapi-db-compare-mongo:
+    image: mongo:6
+    container_name: fastapi-db-compare-mongo
+    restart: "unless-stopped"
+    expose:
+      - 27017
+    command: mongod --bind_ip=0.0.0.0 --dbpath /data/db
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - fastapi-db-compare-network
+
+  mongo-express:
+    image: mongo-express
+    container_name: fastapi-db-compare-mongo-express
+    restart: "unless-stopped"
+    ports:
+      - 9902:8081
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://fastapi-db-compare-mongo:27017/
+    networks:
+      - fastapi-db-compare-network
+
+  #### PostgreSQL ####
+
+  fastapi-db-compare-postgres:
+    image: postgres:15-alpine
+    container_name: fastapi-db-compare-postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data/
+    expose:
+      - 5432
+    environment:
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_DB=pgsqldb
+    networks:
+      - fastapi-db-compare-network
+
+  fastapi-db-compare-pgadmin:
+    image: dpage/pgadmin4
+    container_name: fastapi-db-compare-pgadmin
+    restart: "unless-stopped"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: root
+    ports:
+      - "9903:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    networks:
+      - fastapi-db-compare-network
+
+volumes:
+  redis-data: 
+    name: fastapi-db-compare-redis-data
+  mongo-data:
+    name: fastapi-db-compare-mongo-data
+  postgres-data:
+    name: fastapi-db-compare-postgres-data
+  pgadmin-data:
+    name: fastapi-db-compare-pgadmin-data
+
+networks:
+  fastapi-db-compare-network:
+    name: fastapi-db-compare-network
+    driver: bridge
+
+
